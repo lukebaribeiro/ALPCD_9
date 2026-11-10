@@ -10,9 +10,9 @@ Licenciatura em Ciência de Dados, Universidade do Minho, 2026/27.
 
 | Nome | Número |
 |---|---|
-| _(nome completo)_ | A_____ |
-| _(nome completo)_ | A_____ |
-| _(nome completo)_ | A_____ |
+| _Lucas Ribeiro_ | A116109 |
+| _Bruna Castro_ | A113856 |
+| _Francisca Marques_ | A114880 |
 
 ## Instalação (Windows)
 

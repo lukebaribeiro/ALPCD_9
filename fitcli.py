@@ -70,6 +70,27 @@ def search(
     print_json([processing.summarize(ex) for ex in exercicios])
 
 
+@app.command("type")
+def effort_type(
+    exercise_id: int = typer.Argument(..., help="Id do exercício (ex.: 73)"),
+    motivo: bool = typer.Option(False, "--motivo", "-m", help="Mostra também porque foi classificado assim"),
+):
+    """c) Infere o tipo de esforço de um exercício: compound, isolated, cardio ou other."""
+    # A função chama-se effort_type porque "type" já é uma função do Python;
+    # @app.command("type") dá-lhe o nome "type" na linha de comandos.
+    try:
+        exercicio = api.get_exercise(exercise_id)
+    except api.NotFoundError:
+        typer.echo(f"Erro: não existe nenhum exercício com o id {exercise_id}.", err=True)
+        raise typer.Exit(code=1)
+    except api.APIError as erro:
+        typer.echo(f"Erro: {erro}", err=True)
+        raise typer.Exit(code=1)
+
+    tipo, razao = processing.effort_with_reason(exercicio)
+    typer.echo(f"{tipo} ({razao})" if motivo else tipo)
+
+
 @app.command()
 def equipment(categoria: str = typer.Argument(..., help="Categoria (ex.: chest, back, legs)")):
     """d) Conta as menções a equipamento nas descrições de uma categoria."""

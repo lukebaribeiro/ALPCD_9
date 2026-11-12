@@ -106,3 +106,105 @@ def count_equipment(exercises):
     # Ordena por contagem (decrescente); em caso de empate, por ordem alfabética
     ordenado = sorted(contagem.items(), key=lambda par: (-par[1], par[0]))
     return [{nome: total} for nome, total in ordenado if total > 0]
+
+
+# ---------------------------------------------------------------------------
+# Alínea c) — tipo de esforço (compound / isolated / cardio / other)
+# ---------------------------------------------------------------------------
+# A API não tem um campo com o tipo de esforço: inferimo-lo a partir do NOME,
+# da CATEGORIA, da DESCRIÇÃO e dos MÚSCULOS. As palavras-chave foram escolhidas
+# depois de analisar os 967 exercícios da wger.
+#
+#   compound (composto)  = movimento com várias articulações e vários músculos
+#   isolated (isolado)   = movimento de uma só articulação, foca um músculo
+#   cardio               = esforço cardiovascular (correr, saltar, pedalar...)
+#   other                = posições estáticas, alongamentos, ou sem informação
+
+# Palavras no NOME que indicam cardio
+CARDIO_RE = re.compile(
+    r"\b(?:run(?:ning)?|jog(?:ging)?|sprints?|sprinting|cycling|bike|biking|treadmill"
+    r"|elliptical|jump(?:ing)?[\s-]?rope|skipping|burpees?|jumping[\s-]?jacks?"
+    r"|swim(?:ming)?|rowing machine|stair[\s-]?climb\w*)\b",
+    re.IGNORECASE)
+
+# Movimentos compostos. "\w*press" também apanha nomes colados ("Benchpress").
+COMPOUND_RE = re.compile(
+    r"\b(?:squats?|deadlifts?|\w*press(?:es)?|rows?|rowing|pull[\s-]?ups?|chin[\s-]?ups?"
+    r"|dips?|lunges?|cleans?|snatch(?:es)?|thrusters?|push[\s-]?ups?|step[\s-]?ups?|jerks?"
+    r"|good[\s-]?mornings?|swings?|hip[\s-]?thrusts?|pull[\s-]?downs?|high[\s-]?pulls?)\b",
+    re.IGNORECASE)
+
+# Movimentos isolados. "\w*curls?" também apanha "Hammercurls".
+ISOLATED_RE = re.compile(
+    r"\b(?:\w*curls?|raises?|fl(?:y|ye|yes|ies)|butterfly|extensions?|kick[\s-]?backs?"
+    r"|crunch(?:es)?|shrugs?|pec[\s-]?deck|pullovers?|sit[\s-]?ups?|planks?|twists?"
+    r"|bridges?|push[\s-]?downs?|cross[\s-]?overs?)\b",
+    re.IGNORECASE)
+
+# Exercícios estáticos / alongamentos -> other
+OTHER_RE = re.compile(
+    r"\b(?:stretch\w*|holds?|isometric|mobility|foam[\s-]?roll\w*|hang(?:s|ing)?)\b",
+    re.IGNORECASE)
+
+# Frases explícitas na DESCRIÇÃO
+DESC_COMPOUND_RE = re.compile(r"\b(?:compound|multi[\s-]?joint)\b", re.IGNORECASE)
+DESC_ISOLATED_RE = re.compile(r"\b(?:isolat\w*|single[\s-]joint)\b", re.IGNORECASE)
+
+
+def effort_with_reason(exercise):
+    """Classifica o tipo de esforço e devolve também o motivo da decisão.
+
+    As regras são aplicadas por ordem; a primeira que se verificar decide:
+      1. categoria "Cardio" ou palavra de cardio no nome     -> cardio
+      2. palavra de movimento composto no nome               -> compound
+      3. palavra de movimento isolado no nome                -> isolated
+      4. palavra de exercício estático/alongamento no nome   -> other
+      5. a descrição diz "compound"/"multi-joint"            -> compound
+      6. a descrição diz "isolation"/"single-joint"          -> isolated
+      7. 2+ músculos principais, ou 3+ no total              -> compound
+      8. 1 músculo principal e nenhum secundário             -> isolated
+      9. caso contrário                                      -> other
+
+    >>> ex = {"category": {"name": "Chest"}, "muscles": [{}], "muscles_secondary": [{}, {}],
+    ...       "translations": [{"language": 2, "name": "Bench Press", "description": ""}]}
+    >>> effort_with_reason(ex)
+    ('compound', "o nome contém 'Press'")
+    """
+    traducao = english_translation(exercise)
+    nome = traducao.get("name", "")
+    descricao = clean_html(traducao.get("description", ""))
+    categoria = exercise.get("category", {}).get("name", "")
+    n_principais = len(exercise.get("muscles", []))
+    n_total = n_principais + len(exercise.get("muscles_secondary", []))
+
+    if categoria == "Cardio":
+        return "cardio", "a categoria é Cardio"
+    m = CARDIO_RE.search(nome)
+    if m:
+        return "cardio", f"o nome contém '{m.group()}'"
+    m = COMPOUND_RE.search(nome)
+    if m:
+        return "compound", f"o nome contém '{m.group()}'"
+    m = ISOLATED_RE.search(nome)
+    if m:
+        return "isolated", f"o nome contém '{m.group()}'"
+    m = OTHER_RE.search(nome)
+    if m:
+        return "other", f"o nome contém '{m.group()}'"
+    m = DESC_COMPOUND_RE.search(descricao)
+    if m:
+        return "compound", f"a descrição diz '{m.group()}'"
+    m = DESC_ISOLATED_RE.search(descricao)
+    if m:
+        return "isolated", f"a descrição diz '{m.group()}'"
+    if n_principais >= 2 or n_total >= 3:
+        return "compound", f"trabalha {n_principais} músculo(s) principal(is) e {n_total} no total"
+    if n_principais == 1 and n_total == 1:
+        return "isolated", "trabalha um só músculo"
+    return "other", "sem informação suficiente para classificar"
+
+
+def classify_effort(exercise):
+    """c) Devolve só o tipo de esforço: "compound", "isolated", "cardio" ou "other"."""
+    tipo, _motivo = effort_with_reason(exercise)
+    return tipo

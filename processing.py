@@ -33,6 +33,8 @@ def summarize(exercise):
         "name": english_translation(exercise).get("name", "(sem nome)"),
         "category": exercise["category"]["name"],
         "equipment": [eq["name"] for eq in exercise.get("equipment", [])],
+        # nome comum do músculo (ex.: "Biceps"); se não existir, o nome em latim
+        "muscles": [m["name_en"] or m["name"] for m in exercise.get("muscles", [])],
     }
 
 

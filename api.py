@@ -24,6 +24,14 @@ class APIError(Exception):
     """Erro ao comunicar com a API (sem ligação, 404, 500, ...)."""
 
 
+class NotFoundError(APIError):
+    """O recurso pedido não existe (status 404).
+
+    É uma subclasse de APIError (herança): quem apanha APIError também a
+    apanha, mas quem quiser pode tratar o "não existe" de forma diferente.
+    """
+
+
 def get_json(endpoint, params=None):
     """Faz um pedido GET e devolve a resposta já convertida de JSON para Python.
 
@@ -46,7 +54,7 @@ def get_json(endpoint, params=None):
 
     # Verificação do status code (boa prática pedida no enunciado)
     if resp.status_code == 404:
-        raise APIError(f"Recurso não encontrado (404): {resp.url}")
+        raise NotFoundError(f"Recurso não encontrado (404): {resp.url}")
     if resp.status_code != 200:
         raise APIError(f"A API respondeu com erro {resp.status_code}: {resp.url}")
 

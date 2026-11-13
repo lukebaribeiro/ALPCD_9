@@ -42,5 +42,19 @@ def top(n: int = typer.Argument(..., min=1, help="Número de exercícios a mostr
     print_json([processing.summarize(ex) for ex in exercicios])
 
 
+
+@app.command()
+def equipment(categoria: str = typer.Argument(..., help="Categoria (ex.: chest, back, legs)")):
+    """d) Conta as menções a equipamento nas descrições de uma categoria."""
+    try:
+        filtro = api.resolve_filter(categoria)        # "chest" -> {"category": 11}
+        exercicios = api.get_exercises(filtro)        # todos os exercícios (com paginação)
+    except api.APIError as erro:
+        typer.echo(f"Erro: {erro}", err=True)
+        raise typer.Exit(code=1)
+
+    print_json(processing.count_equipment(exercicios))
+
+
 if __name__ == "__main__":
     app()

@@ -8,6 +8,8 @@ chamam o requests diretamente. Assim, as boas práticas pedidas no enunciado
 uma só vez.
 """
 
+from functools import lru_cache
+
 import requests
 
 BASE_URL = "https://wger.de/api/v2/"
@@ -110,11 +112,16 @@ def get_exercise(exercise_id):
     return get_json(f"exerciseinfo/{exercise_id}/")
 
 
+# @lru_cache guarda o resultado da primeira chamada: as categorias e os músculos
+# quase nunca mudam, por isso no comando workout ("biceps,back,chest") pedimo-los
+# à API uma só vez em vez de uma vez por grupo.
+@lru_cache(maxsize=None)
 def get_categories():
     """Lista das categorias de exercícios (Abs, Arms, Back, Chest, ...)."""
     return get_all("exercisecategory/")
 
 
+@lru_cache(maxsize=None)
 def get_muscles():
     """Lista dos músculos. Cada um tem "name" (latim) e "name_en" (nome comum)."""
     return get_all("muscle/")

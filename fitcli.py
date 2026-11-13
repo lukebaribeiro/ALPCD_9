@@ -12,7 +12,9 @@ from typing import Optional
 import typer
 
 import api
+import export
 import processing
+import workout as plano_treino
 
 app = typer.Typer(help="CLI para pesquisar exercícios físicos na API wger.")
 
@@ -102,6 +104,40 @@ def equipment(categoria: str = typer.Argument(..., help="Categoria (ex.: chest, 
         raise typer.Exit(code=1)
 
     print_json(processing.count_equipment(exercicios))
+
+
+@app.command()
+def workout(
+    grupos: str = typer.Argument(..., help="Músculos/categorias separados por vírgula (ex.: biceps,back)"),
+    tipo: str = typer.Argument(..., help="compound, isolated ou any (sem filtro)"),
+    n: int = typer.Argument(..., min=1, help="Número máximo de exercícios por músculo/categoria"),
+    csv: Optional[str] = typer.Option(None, "--csv", help="Exporta o plano para este ficheiro CSV"),
+):
+    """e) Gera um plano de treino personalizado (combina as alíneas b e c)."""
+    lista = plano_treino.parse_groups(grupos)
+    if not lista:
+        typer.echo("Erro: indique pelo menos um músculo ou categoria.", err=True)
+        raise typer.Exit(code=1)
+    try:
+        plano = plano_treino.build_plan(lista, tipo.lower(), n)
+    except (api.APIError, ValueError) as erro:
+        typer.echo(f"Erro: {erro}", err=True)
+        raise typer.Exit(code=1)
+
+    # Aviso (no stderr, para não estragar o JSON) quando um grupo tem menos de N
+    for grupo, exercicios in plano.items():
+        if len(exercicios) < n:
+            typer.echo(f"Aviso: '{grupo}' só tem {len(exercicios)} exercício(s) do tipo {tipo}.", err=True)
+
+    if csv:
+        try:
+            total = export.to_csv(plano, csv)
+        except OSError as erro:                         # ex.: pasta inexistente, ficheiro aberto no Excel
+            typer.echo(f"Erro ao escrever '{csv}': {erro}", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"Ficheiro exportado: {csv} ({total} registos)")
+    else:
+        print_json(plano)
 
 
 if __name__ == "__main__":

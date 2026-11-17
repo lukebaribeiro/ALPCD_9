@@ -1,0 +1,15 @@
+# Ambiente virtual (cada elemento cria o seu)
+.venv/
+
+# Ficheiros gerados pelo Python
+__pycache__/
+*.pyc
+
+# Ficheiros gerados pelo programa
+*.csv
+cache.json
+
+# Ficheiros do sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/

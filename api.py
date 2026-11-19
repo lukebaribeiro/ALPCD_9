@@ -116,3 +116,60 @@ def get_exercise(exercise_id):
 #   resolve_filter("chest")  -> {"category": 11}
 #   nome inexistente         -> levanta APIError com as opções válidas
 # =============================================================================
+
+# @lru_cache guarda o resultado da primeira chamada: as categorias e os músculos
+# quase nunca mudam, por isso no comando workout ("biceps,back,chest") pedimo-los
+# à API uma só vez em vez de uma vez por grupo.
+@lru_cache(maxsize=None)
+def get_categories():
+    """Lista das categorias de exercícios (Abs, Arms, Back, Chest, ...)."""
+    return get_all("exercisecategory/")
+
+
+@lru_cache(maxsize=None)
+def get_muscles():
+    """Lista dos músculos. Cada um tem "name" (latim) e "name_en" (nome comum)."""
+    return get_all("muscle/")
+
+
+def resolve_filter(termo):
+    """Converte o nome de um músculo ou categoria no filtro da API.
+
+    Exemplos:
+        resolve_filter("chest")   -> {"category": 11}
+        resolve_filter("biceps")  -> {"muscles": 1}
+        resolve_filter("xpto")    -> levanta APIError
+
+    Ordem de procura (ignora maiúsculas e espaços a mais):
+      1. nome de uma CATEGORIA          ("Chest", "Back", ...)
+      2. nome comum de um MÚSCULO       ("Biceps", "Lats", ...)
+      3. nome em latim de um MÚSCULO    ("Biceps brachii", ...)
+      4. parte do nome de UM só músculo ("pectoralis" -> "Pectoralis major")
+    As categorias vêm primeiro porque alguns nomes existem nas duas listas
+    (ex.: "Chest" é categoria e é o nome comum do Pectoralis major).
+    """
+    alvo = termo.strip().lower()
+    categorias = get_categories()
+    musculos = get_muscles()
+
+    # 1. Categoria com o nome exato
+    for categoria in categorias:
+        if categoria["name"].lower() == alvo:
+            return {"category": categoria["id"]}
+
+    # 2 e 3. Músculo com o nome comum ou o nome em latim exato
+    for musculo in musculos:
+        if alvo in (musculo["name_en"].lower(), musculo["name"].lower()):
+            return {"muscles": musculo["id"]}
+
+    # 4. Músculo cujo nome em latim CONTÉM o termo, desde que seja só um
+    parecidos = [m for m in musculos if alvo in m["name"].lower()]
+    if len(parecidos) == 1:
+        return {"muscles": parecidos[0]["id"]}
+
+    # Nada encontrado (ou ambíguo): mensagem com as opções válidas
+    opcoes = sorted({c["name"] for c in categorias}
+                    | {m["name_en"] or m["name"] for m in musculos})
+    raise APIError(f"Músculo/categoria desconhecido: '{termo}'. "
+                   f"Opções válidas: {', '.join(opcoes)}")
+

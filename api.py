@@ -8,6 +8,8 @@ chamam o requests diretamente. Assim, as boas práticas pedidas no enunciado
 uma só vez.
 """
 
+from functools import lru_cache
+
 import requests
 
 BASE_URL = "https://wger.de/api/v2/"

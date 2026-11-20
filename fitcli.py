@@ -83,7 +83,7 @@ def search(
     print_json([processing.summarize(ex) for ex in exercicios])
 
 # =============================================================================
-# c) type — Bruna
+# c) type — Lucas
 # =============================================================================
 @app.command("type")
 def effort_type(
@@ -121,7 +121,7 @@ def equipment(categoria: str = typer.Argument(..., help="Categoria (ex.: chest, 
     print_json(processing.count_equipment(exercicios))
 
 # =============================================================================
-# e) workout — Bruna
+# e) workout — Lucas
 # =============================================================================
 @app.command()
 def workout(
@@ -155,6 +155,7 @@ def workout(
         typer.echo(f"Ficheiro exportado: {csv} ({total} registos)")
     else:
         print_json(plano)
+
 
 if __name__ == "__main__":
     app()

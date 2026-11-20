@@ -39,6 +39,7 @@ def summarize(exercise):
         "name": english_translation(exercise).get("name", "(sem nome)"),
         "category": exercise["category"]["name"],
         "equipment": [eq["name"] for eq in exercise.get("equipment", [])],
+         "muscles": [m["name_en"] or m["name"] for m in exercise.get("muscles", [])],
     }
 
 

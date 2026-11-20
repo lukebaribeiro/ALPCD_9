@@ -85,52 +85,25 @@ def search(
 # =============================================================================
 # c) type — Bruna
 # =============================================================================
-# Cada equipamento -> regex que o reconhece (sem \b; as fronteiras são postas abaixo).
-EQUIPMENT_PATTERNS = {
-    # "bar" sozinho também conta como barbell, EXCETO depois de pull-up / chin-up / sz / ez
-    "barbell": r"barbells?|(?<!pull-up )(?<!pullup )(?<!pull up )(?<!chin-up )"
-               r"(?<!sz-)(?<!sz )(?<!ez-)(?<!ez )bars?",
-    "dumbbell": r"dumbbells?",
-    "cable": r"cables?",
-    "machine": r"machines?",
-    "bodyweight": r"body[\s-]?weight",          # bodyweight, body weight, body-weight
-    "bench": r"bench(?:es)?",
-    "kettlebell": r"kettlebells?",
-    "resistance band": r"(?:resistance )?bands?",
-    "pull-up bar": r"(?:pull|chin)[\s-]?up bars?",
-    "ez-bar": r"(?:ez|sz)[\s-]bars?",
-}
+@app.command("type")
+def effort_type(
+    exercise_id: int = typer.Argument(..., help="Id do exercício (ex.: 73)"),
+    motivo: bool = typer.Option(False, "--motivo", "-m", help="Mostra também porque foi classificado assim"),
+):
+    """c) Infere o tipo de esforço de um exercício: compound, isolated, cardio ou other."""
+    # A função chama-se effort_type porque "type" já é uma função do Python;
+    # @app.command("type") dá-lhe o nome "type" na linha de comandos.
+    try:
+        exercicio = api.get_exercise(exercise_id)
+    except api.NotFoundError:
+        typer.echo(f"Erro: não existe nenhum exercício com o id {exercise_id}.", err=True)
+        raise typer.Exit(code=1)
+    except api.APIError as erro:
+        typer.echo(f"Erro: {erro}", err=True)
+        raise typer.Exit(code=1)
 
-# Compilamos cada regex UMA vez, já com \b à volta e a ignorar maiúsculas.
-# (?:...) é um grupo SEM captura: agrupa as alternativas sem alterar o que o findall devolve.
-EQUIPMENT_REGEX = {
-    nome: re.compile(rf"\b(?:{padrao})\b", re.IGNORECASE)
-    for nome, padrao in EQUIPMENT_PATTERNS.items()
-}
-
-
-def count_equipment(exercises):
-    """d) Conta as menções a cada equipamento nas descrições dos exercícios.
-
-    Devolve uma lista ordenada por ordem decrescente de ocorrências, no
-    formato do enunciado: [{"bench": 38}, {"dumbbell": 25}, ...].
-    Equipamentos com 0 menções não aparecem.
-
-    >>> ex = {"translations": [{"language": 2,
-    ...       "description": "<p>Lie on the bench and hold the bar.</p><p>Use a bench.</p>"}]}
-    >>> count_equipment([ex])
-    [{'bench': 2}, {'barbell': 1}]
-    """
-    contagem = {nome: 0 for nome in EQUIPMENT_REGEX}
-    for exercise in exercises:
-        descricao = processing.english_translation(exercise).get("description", "")
-        texto = processing.clean_html(descricao)
-        for nome, regex in EQUIPMENT_REGEX.items():
-            contagem[nome] += len(regex.findall(texto))
-
-    # Ordena por contagem (decrescente); em caso de empate, por ordem alfabética
-    ordenado = sorted(contagem.items(), key=lambda par: (-par[1], par[0]))
-    return [{nome: total} for nome, total in ordenado if total > 0]
+    tipo, razao = processing.effort_with_reason(exercicio)
+    typer.echo(f"{tipo} ({razao})" if motivo else tipo)
 
 # =============================================================================
 # d) equipment — Lucas

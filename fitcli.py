@@ -5,6 +5,7 @@ Utilização:
     python fitcli.py --help
     python fitcli.py <comando> --help
 """
+import re
 
 import json
 from typing import Optional
@@ -82,14 +83,69 @@ def search(
     print_json([processing.summarize(ex) for ex in exercicios])
 
 # =============================================================================
-# c) type — Lucas
+# c) type — Bruna
 # =============================================================================
+# Cada equipamento -> regex que o reconhece (sem \b; as fronteiras são postas abaixo).
+EQUIPMENT_PATTERNS = {
+    # "bar" sozinho também conta como barbell, EXCETO depois de pull-up / chin-up / sz / ez
+    "barbell": r"barbells?|(?<!pull-up )(?<!pullup )(?<!pull up )(?<!chin-up )"
+               r"(?<!sz-)(?<!sz )(?<!ez-)(?<!ez )bars?",
+    "dumbbell": r"dumbbells?",
+    "cable": r"cables?",
+    "machine": r"machines?",
+    "bodyweight": r"body[\s-]?weight",          # bodyweight, body weight, body-weight
+    "bench": r"bench(?:es)?",
+    "kettlebell": r"kettlebells?",
+    "resistance band": r"(?:resistance )?bands?",
+    "pull-up bar": r"(?:pull|chin)[\s-]?up bars?",
+    "ez-bar": r"(?:ez|sz)[\s-]bars?",
+}
 
+# Compilamos cada regex UMA vez, já com \b à volta e a ignorar maiúsculas.
+# (?:...) é um grupo SEM captura: agrupa as alternativas sem alterar o que o findall devolve.
+EQUIPMENT_REGEX = {
+    nome: re.compile(rf"\b(?:{padrao})\b", re.IGNORECASE)
+    for nome, padrao in EQUIPMENT_PATTERNS.items()
+}
+
+
+def count_equipment(exercises):
+    """d) Conta as menções a cada equipamento nas descrições dos exercícios.
+
+    Devolve uma lista ordenada por ordem decrescente de ocorrências, no
+    formato do enunciado: [{"bench": 38}, {"dumbbell": 25}, ...].
+    Equipamentos com 0 menções não aparecem.
+
+    >>> ex = {"translations": [{"language": 2,
+    ...       "description": "<p>Lie on the bench and hold the bar.</p><p>Use a bench.</p>"}]}
+    >>> count_equipment([ex])
+    [{'bench': 2}, {'barbell': 1}]
+    """
+    contagem = {nome: 0 for nome in EQUIPMENT_REGEX}
+    for exercise in exercises:
+        descricao = processing.english_translation(exercise).get("description", "")
+        texto = processing.clean_html(descricao)
+        for nome, regex in EQUIPMENT_REGEX.items():
+            contagem[nome] += len(regex.findall(texto))
+
+    # Ordena por contagem (decrescente); em caso de empate, por ordem alfabética
+    ordenado = sorted(contagem.items(), key=lambda par: (-par[1], par[0]))
+    return [{nome: total} for nome, total in ordenado if total > 0]
 
 # =============================================================================
 # d) equipment — Lucas
 # =============================================================================
+@app.command()
+def equipment(categoria: str = typer.Argument(..., help="Categoria (ex.: chest, back, legs)")):
+    """d) Conta as menções a equipamento nas descrições de uma categoria."""
+    try:
+        filtro = api.resolve_filter(categoria)        # "chest" -> {"category": 11}
+        exercicios = api.get_exercises(filtro)        # todos os exercícios (com paginação)
+    except api.APIError as erro:
+        typer.echo(f"Erro: {erro}", err=True)
+        raise typer.Exit(code=1)
 
+    print_json(processing.count_equipment(exercicios))
 
 # =============================================================================
 # e) workout — Bruna
